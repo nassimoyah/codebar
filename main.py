@@ -9,6 +9,8 @@ from concurrent.futures import ThreadPoolExecutor
 #second commit 
 # Global variables
 print("tets commit")
+print("tets commit")
+print("tets commit")
 discount_percentage = 100
 items = {
     b'26035352': {"name": "Chips", "price": 0.15},
