@@ -1,4 +1,4 @@
-import tkinter as tk
+import tkinter as tk 
 from tkinter import messagebox
 import cv2
 from pyzbar.pyzbar import decode
@@ -6,14 +6,13 @@ import pygame
 import time
 import threading
 import sys
+import json
 from concurrent.futures import ThreadPoolExecutor
 
 # Global variables
 discount_percentage = 100
-items = {
-    b'26035352': {"name": "Chips", "price": 0.15},
-    b'5410153131455': {"name": "Haricos", "price": 0.50},
-}
+ITEMS_FILE = "items.json"  # File to store items
+items = {}
 price = 0
 window_open = False
 executor = ThreadPoolExecutor(max_workers=2)  # Thread pool for managing GUI windows
@@ -24,6 +23,29 @@ cap = None  # To hold the camera object
 pygame.mixer.init()
 pygame.mixer.music.load("C:\\beep\\beep-02.wav")
 
+def load_items():
+    """Load items from a JSON file."""
+    global items
+    try:
+        with open(ITEMS_FILE, "r") as file:
+            items = json.load(file)
+            # Convert keys back to bytes
+            items = {bytes(key, "utf-8"): value for key, value in items.items()}
+    except FileNotFoundError:
+        # If the file doesn't exist, start with default items
+        items = {
+          
+        }
+    except json.JSONDecodeError:
+        print("Error decoding JSON. Starting with default items.")
+        items = {}
+
+def save_items():
+    """Save items to a JSON file."""
+    # Convert byte keys to strings for JSON serialization
+    serializable_items = {key.decode("utf-8"): value for key, value in items.items()}
+    with open(ITEMS_FILE, "w") as file:
+        json.dump(serializable_items, file, indent=4)
 
 def set_camera(index):
     global camera_index, cap
@@ -36,7 +58,6 @@ def set_camera(index):
 
     camera_selection_window.destroy()  # Close the camera selection window
     start_camera_feed()  # Start camera feed
-
 
 def choose_camera():
     global camera_selection_window
@@ -53,7 +74,6 @@ def choose_camera():
     button_cam1.pack(pady=5)
 
     camera_selection_window.mainloop()
-
 
 def start_camera_feed():
     global cap
@@ -88,19 +108,6 @@ def start_camera_feed():
     cap.release()
     cv2.destroyAllWindows()
 
-
-def subtract_price():
-    global price
-    try:
-        entered_amount = float(entry.get())
-        discounted_price = price * entered_amount / 100  
-        result_label.config(text=f"Price to pay: {discounted_price:.2f}")
-        price = 0
-        entry.delete(0, tk.END)
-    except ValueError:
-        messagebox.showerror("Invalid Input", "Please enter a valid number.")
-
-
 def open_window():
     global window_open
     if window_open:
@@ -112,24 +119,32 @@ def open_window():
         window_open = False
         root.destroy()
 
+    def update_price(percentage):
+        payable_price = price * (percentage / 100)
+        result_label.config(text=f"Price to pay: {payable_price:.2f}")
+
+    def reset_client():
+        global price
+        price = 0
+        result_label.config(text=f"Total Price: {price:.2f}")
+
     root = tk.Tk()
-    root.title("Price Subtraction")
-    root.geometry("350x250")
+    root.title("Price Calculation")
+    root.geometry("350x300")
     root.protocol("WM_DELETE_WINDOW", on_close)
 
-    tk.Label(root, text="Enter the client percentage").pack(pady=10)
-    global entry
-    entry = tk.Entry(root, width=20)
-    entry.pack(pady=5)
+    tk.Label(root, text="Select the percentage to pay:").pack(pady=10)
 
-    tk.Button(root, text="Submit", command=subtract_price).pack(pady=10)
+    for percentage in [10, 15, 20]:
+        tk.Button(root, text=f"{percentage}%", command=lambda p=percentage: update_price(p)).pack(pady=5)
 
     global result_label
     result_label = tk.Label(root, text=f"Total Price: {price:.2f}", font=("Arial", 12, "bold"))
     result_label.pack(pady=20)
 
-    root.mainloop()
+    tk.Button(root, text="Finish with Client", command=reset_client).pack(pady=10)
 
+    root.mainloop()
 
 def add_new_item(code):
     global items
@@ -141,6 +156,7 @@ def add_new_item(code):
             item_price = float(price_entry.get())
             items[code] = {"name": name, "price": item_price}
             price += item_price
+            save_items()  # Save the updated items to the file
             messagebox.showinfo("Item Added", f"Item '{name}' added with price: {price:.2f}")
             new_item_window.destroy()
         except ValueError:
@@ -161,7 +177,6 @@ def add_new_item(code):
     tk.Button(new_item_window, text="Save Item", command=save_item).pack(pady=10)
     new_item_window.mainloop()
 
-
 def process_barcode(code):
     global price
     if code in items:
@@ -171,7 +186,6 @@ def process_barcode(code):
     else:
         print(f"Scanned Code: {code}. Item not found.")
         add_new_item(code)
-
 
 def open_calculator():
     calc_window = tk.Tk()
@@ -220,9 +234,7 @@ def open_calculator():
     tk.Label(calc_window, textvariable=current_input, font=("Arial", 16)).pack(pady=20)
     calc_window.mainloop()
 
-
 last_pressed = time.time()
-
 
 def is_debounced(interval=0.3):
     global last_pressed
@@ -232,6 +244,8 @@ def is_debounced(interval=0.3):
         return True
     return False
 
+# Load items at the beginning
+load_items()
 
 # Run the camera selection window first
 choose_camera()
