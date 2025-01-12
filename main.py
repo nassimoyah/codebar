@@ -8,8 +8,8 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 #second commit 
 # Global variables
-print("tets commit")
-print("tets commit")
+print("45")
+print("45")
 print("tets commit")
 discount_percentage = 100
 items = {
